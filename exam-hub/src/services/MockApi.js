@@ -29,3 +29,14 @@ export const fetchExamResults = async (examId) => {
   return { average: data.average ?? data.moyenne ?? 0, scale: 20, rows }
 }
 
+export const fetchStudentHistory = () => fetchWithAuth('/my/results')
+
+export const fetchExamCorrection = (examId) => fetchWithAuth(`/my/results/${examId}`)
+
+export const submitExamAttempt = (examId, answers) => {
+  const reponses = Object.entries(answers).map(([questionId, choiceId]) => ({ questionId, choiceId }))
+  return fetchWithAuth(`/my/exams/${examId}/submit`, {
+    method: 'POST',
+    body: JSON.stringify({ reponses }),
+  })
+}
