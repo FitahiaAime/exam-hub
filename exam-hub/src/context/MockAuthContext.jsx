@@ -1,46 +1,64 @@
-import { createContext, useContext, useState, useCallback } from 'react'
-const MockAuthContext = createContext(null)
-const DEMO_USERS = {
-  admin: { id: 'u1', name: 'Admin Exam Hub', email: 'admin@examhub.fr', role: 'admin' },
-  student: { id: 'u2', name: 'Alison Kouadio', email: 'alison.kouadio@mail.com', role: 'student' },
+import { createContext, useContext, useState, useCallback, useEffect } from 'react'
+import { fetchWithAuth, getToken, setToken, removeToken } from '../services/fetchWithAuth.js'
+import { decodeToken } from '../utils/decodeToken.js'
+
+const AuthContext = createContext(null)
+const USER_CACHE_KEY = 'exam-hub-user'
+
+const readCachedUser = () => {
+  try {
+    const raw = localStorage.getItem(USER_CACHE_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
 }
+
 export const MockAuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
-    const savedRole = localStorage.getItem('exam-hub-mock-role')
-    return savedRole ? DEMO_USERS[savedRole] : null
+    const token = getToken()
+    return token ? readCachedUser() : null
   })
   const [loginError, setLoginError] = useState(null)
   const [isLoggingIn, setIsLoggingIn] = useState(false)
-  const login = useCallback((email, password) => {
+
+  useEffect(() => {
+    const token = getToken()
+    if (token && !decodeToken(token)) {
+      removeToken()
+      localStorage.removeItem(USER_CACHE_KEY)
+      setUser(null)
+    }
+  }, [])
+
+  const login = useCallback(async (email, password) => {
     setIsLoggingIn(true)
     setLoginError(null)
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        setIsLoggingIn(false)
-        if (email === 'desactive@examhub.fr') {
-          const message = 'Ce compte a été désactivé. Contactez un administrateur.'
-          setLoginError(message)
-          reject(new Error(message))
-          return
-        }
-        if (!email || !password) {
-          const message = 'Identifiants invalides'
-          setLoginError(message)
-          reject(new Error(message))
-          return
-        }
-        const role = email.includes('admin') ? 'admin' : 'student'
-        const demoUser = DEMO_USERS[role]
-        localStorage.setItem('exam-hub-mock-role', role)
-        setUser(demoUser)
-        resolve(demoUser)
-      }, 900)
-    })
+    try {
+      const data = await fetchWithAuth('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      })
+      const payload = decodeToken(data.token)
+      const nextUser = { id: payload?.userId ?? null, name: email, email, role: data.role }
+      setToken(data.token)
+      localStorage.setItem(USER_CACHE_KEY, JSON.stringify(nextUser))
+      setUser(nextUser)
+      setIsLoggingIn(false)
+      return nextUser
+    } catch (err) {
+      setIsLoggingIn(false)
+      setLoginError(err.message)
+      throw err
+    }
   }, [])
+
   const logout = useCallback(() => {
-    localStorage.removeItem('exam-hub-mock-role')
+    removeToken()
+    localStorage.removeItem(USER_CACHE_KEY)
     setUser(null)
   }, [])
+
   const value = {
     user,
     role: user?.role ?? null,
@@ -50,10 +68,11 @@ export const MockAuthProvider = ({ children }) => {
     login,
     logout,
   }
-  return <MockAuthContext.Provider value={value}>{children}</MockAuthContext.Provider>
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
+
 export const useAuth = () => {
-  const ctx = useContext(MockAuthContext)
+  const ctx = useContext(AuthContext)
   if (!ctx) throw new Error('useAuth doit être utilisé à l\'intérieur de <MockAuthProvider>')
   return ctx
 }
