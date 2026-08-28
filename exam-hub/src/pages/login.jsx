@@ -46,7 +46,7 @@ const Login = () => {
           label="Email"
           type="email"
           name="email"
-          placeholder="vous@exemple.com"
+          placeholder="admin@examhub.fr"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           error={fieldErrors.email}
@@ -68,11 +68,6 @@ const Login = () => {
         <Button type="submit" isLoading={isLoggingIn} size="lg" className="w-full">
           {isLoggingIn ? 'Connexion...' : 'Se connecter'}
         </Button>
-        <p className="text-center text-xs text-text-secondary">
-          Démo : un email contenant « admin » connecte en administrateur, sinon en étudiant.
-          <br />
-          Utilisez « desactive@examhub.fr » pour voir le message RG-11.
-        </p>
       </form>
     </div>
   )
